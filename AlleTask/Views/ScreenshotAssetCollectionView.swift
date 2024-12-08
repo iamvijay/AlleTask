@@ -44,7 +44,7 @@ class ScreenshotAssetCollectionView: UICollectionView {
     private var screenshotDataSource : UICollectionViewDiffableDataSource<Int, PHAsset>!
     private var viewType : ViewType
     weak var collectionViewDelegate : ScreenShotViewDelegate?
-    
+    let cachingManager = PHCachingImageManager()
     // MARK: - Initialization
     
     /// Initializes the custom collection view with the given layout and view type.
@@ -77,12 +77,11 @@ class ScreenshotAssetCollectionView: UICollectionView {
             guard let self = self else { return }
             switch status {
             case .success(let newAssets):
-                print("success")
                 self.updateSnapshot(with: newAssets)
                 self.collectionViewDelegate?.didCollectionViewHasSingleData(self.assetModel.allAssets?.count ?? 0)
             case .failure(let error):
                 self.collectionViewDelegate?.didCollectionViewHasSingleData(0)
-                print("No more data: \(error)")
+                print("No data: \(error)")
             }
         }
     }
@@ -92,11 +91,16 @@ class ScreenshotAssetCollectionView: UICollectionView {
     func updateSnapshot(with newAssets: [PHAsset]) {
         DispatchQueue.global(qos: .userInitiated).async {
             var snapshot = self.screenshotDataSource.snapshot()
+            let existingItems = Set(snapshot.itemIdentifiers)
+            
+            // Filter new assets to exclude duplicates
+            let filteredAssets = newAssets.filter { !existingItems.contains($0) }
+            
             if snapshot.sectionIdentifiers.isEmpty {
                 snapshot.appendSections([0])
             }
             
-            snapshot.appendItems(newAssets)
+            snapshot.appendItems(filteredAssets)
             DispatchQueue.main.async {
                 self.screenshotDataSource.apply(snapshot, animatingDifferences: false)
             }
@@ -137,6 +141,7 @@ extension ScreenshotAssetCollectionView: UIScrollViewDelegate {
         if let collectionView = scrollView as? UICollectionView, viewType == .enlarged {
             let pageIndex = Int(scrollView.contentOffset.x / scrollView.frame.width)
             let indexPath = IndexPath(row: pageIndex, section: 0)
+            
             collectionViewDelegate?.didCollectionViewScrollEnded(indexPath: indexPath, collectionView: collectionView)
         }
     }
@@ -145,15 +150,14 @@ extension ScreenshotAssetCollectionView: UIScrollViewDelegate {
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         guard let collectionView = scrollView as? UICollectionView else { return }
         
-        if viewType == .thumbnail,
-           let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+        if viewType == .thumbnail {
+            // Calculate the center X of the visible collection view
+            let centerX = scrollView.contentOffset.x + (scrollView.bounds.width / 2)
+            let centerPoint = CGPoint(x: centerX, y: scrollView.bounds.height / 2)
             
-            let pageWidth = layout.itemSize.width + layout.minimumLineSpacing
-            let pageIndex = Int((scrollView.contentOffset.x + (pageWidth / 2)) / pageWidth)
-            
-            if pageIndex < collectionView.numberOfItems(inSection: 0) {
-                let indexPath = IndexPath(row: pageIndex, section: 0)
-                collectionViewDelegate?.didCollectionViewScrolled(indexPath: indexPath, collectionView: collectionView)
+            // Find the closest cell to the center
+            if let closestIndexPath = collectionView.indexPathForItem(at: centerPoint) {
+                collectionViewDelegate?.didCollectionViewScrolled(indexPath: closestIndexPath, collectionView: collectionView)
             }
         }
     }

@@ -27,8 +27,8 @@ class ScreenshotAssetsViewModel {
     private var screenShots: [PHAsset] = []
     private(set) var allAssets: PHFetchResult<PHAsset>?
     private var currentOffset = 0
-    private let batchSize = 20
-    private let thumbnailSize = CGSize(width: 40, height: 60)
+    private let batchSize = Constants.batchSize
+    private let thumbnailSize = CGSize(width: Constants.thumbnailItemWidth, height: Constants.thumbnailHeight)
     private let enlargedSize = CGSize(width: UIScreen.main.bounds.width * UIScreen.main.scale,
                                       height: UIScreen.main.bounds.height * UIScreen.main.scale)
     
@@ -68,6 +68,12 @@ class ScreenshotAssetsViewModel {
         let totalAssets = allAssets.count
         
         func processBatch() {
+            // If all assets are processed, complete the process
+            guard currentOffset < totalAssets else {
+                completion(.success(screenShots)) // Notify when all batches are processed
+                return
+            }
+            
             let endOffset = min(currentOffset + batchSize, totalAssets)
             let newAssets = (currentOffset..<endOffset).map { allAssets.object(at: $0) }
             currentOffset = endOffset
@@ -82,7 +88,13 @@ class ScreenshotAssetsViewModel {
             DispatchQueue.main.async {
                 completion(.success(newAssets))
             }
+            
+            // Continue to the next batch after a short delay
+            DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
+                processBatch() // Call processBatch recursively
+            }
         }
+        
         processBatch() // Start the first batch
     }
     
@@ -90,11 +102,8 @@ class ScreenshotAssetsViewModel {
     ///
     /// - Parameter assets: Array of `PHAsset` to be cached.
     private func startCaching(for assets: [PHAsset]) {
-        cachingManager.startCachingThumbnails(for: assets, targetSize: thumbnailSize, contentMode: PHImageContentMode.aspectFill)
-        
-        // Cache enlarged images after a slight delay to optimize performance
-        DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 0.2) { [weak self] in
-            self?.cachingManager.startCachingEnlarged(for: assets, targetSize: self?.enlargedSize ?? CGSize(width: 0, height: 0), contentMode: PHImageContentMode.aspectFit)
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            self?.cachingManager.startCachingAssets(for: assets, targetSize: self?.thumbnailSize ?? CGSize(width: 0, height: 0), contentMode: PHImageContentMode.aspectFill)
         }
     }
 }

@@ -33,7 +33,7 @@ class ScreenshotsAssetViewController: UIViewController {
     var thumbnailCollectionView : ScreenshotAssetCollectionView = {
         let collectionViewFlowLayout = CenterTransformFlowLayout()
         collectionViewFlowLayout.scrollDirection = .horizontal
-        collectionViewFlowLayout.itemSize = CGSize(width: 40, height: 60) // Default size
+        collectionViewFlowLayout.itemSize = CGSize(width: Constants.thumbnailItemWidth, height: Constants.thumbnailHeight) // Default size
         collectionViewFlowLayout.minimumLineSpacing = 5
         collectionViewFlowLayout.sectionInset = UIEdgeInsets(top: 0, left: UIScreen.main.bounds.midX, bottom: 0, right: UIScreen.main.bounds.midX)
         
@@ -132,7 +132,7 @@ class ScreenshotsAssetViewController: UIViewController {
             thumbnailCollectionView.leadingAnchor.constraint(equalTo: self.thumbnailViewContainer.safeAreaLayoutGuide.leadingAnchor),
             thumbnailCollectionView.trailingAnchor.constraint(equalTo: self.thumbnailViewContainer.safeAreaLayoutGuide.trailingAnchor),
             thumbnailCollectionView.topAnchor.constraint(equalTo: self.thumbnailViewContainer.topAnchor),
-            thumbnailCollectionView.heightAnchor.constraint(equalToConstant: 60.0)
+            thumbnailCollectionView.heightAnchor.constraint(equalToConstant: Constants.thumbnailHeight)
         ])
         
         statusLabel.text = "No Authorization \n Goto setting and give access"
@@ -144,20 +144,20 @@ extension ScreenshotsAssetViewController: ScreenShotViewDelegate {
     /// Handles visibility of UI elements based on the number of assets.
     /// - Parameter count: The number of items available in the data source.
     func didCollectionViewHasSingleData(_ count: Int) {
-        // If there are 1 or fewer items, hide the thumbnail view.
-        if count <= 1 {
-            thumbnailViewContainer.isHidden = true
+        DispatchQueue.main.async {
+            let hasData = count > 0
+            let hasMultipleData = count > 1
             
-            // Show status label if no items are available.
-            statusLabel.isHidden = !(count == 0)
-            statusLabel.text = "No Photos to show"
-        }  else {
-            thumbnailViewContainer.isHidden = false
+            // Update thumbnail and enlarged collection view visibility
+            self.thumbnailViewContainer.isHidden = !hasMultipleData
+            self.enlargedCollectionView.isHidden = !hasData
+            
+            // Update status label visibility and message
+            self.statusLabel.isHidden = hasData
+            self.statusLabel.text = hasData ? "" : "No Photos to show"
         }
-        
-        // Show or hide the enlarged collection view based on available data.
-        enlargedCollectionView.isHidden = !(count >= 1)
     }
+
     
     /// Synchronizes scrolling when the scroll gesture ends.
     /// - Parameters:
@@ -197,12 +197,12 @@ extension ScreenshotsAssetViewController: ScreenShotViewDelegate {
     private func synchronizeScroll(from sourceCollectionView: UICollectionView, to targetCollectionView: UICollectionView?, indexPath: IndexPath, animated: Bool) {
         guard let targetCollectionView = targetCollectionView, !isProgrammaticScroll else { return }
         
-        // Scroll the target collection view to the specified item.
         isProgrammaticScroll = true
+        
         targetCollectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: animated)
         resetProgrammaticScrollFlag()
     }
-    
+
     /// Determines the target collection view to synchronize with.
     /// - Parameter sourceCollectionView: The collection view initiating the action.
     /// - Returns: The target collection view for synchronization, or `nil` if not applicable.

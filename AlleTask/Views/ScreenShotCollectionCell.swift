@@ -16,6 +16,7 @@ class ScreenShotCollectionCell: UICollectionViewCell {
     
     private let screenshotImageView : UIImageView = {
         let imageView = UIImageView()
+        imageView.translatesAutoresizingMaskIntoConstraints = false
         imageView.clipsToBounds = true
         
         return imageView
@@ -32,12 +33,17 @@ class ScreenShotCollectionCell: UICollectionViewCell {
         fatalError("init(coder:) has not been implemented")
     }
     
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        // Reset the image to avoid retaining old images
+        screenshotImageView.image = nil
+    }
+    
     // MARK: - UI Setup
     
     /// Configures the cell's layout and appearance.
     private func setupUI() {
         contentView.backgroundColor = .black
-        screenshotImageView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(screenshotImageView)
         
         NSLayoutConstraint.activate([
@@ -81,12 +87,14 @@ class CenterTransformFlowLayout: UICollectionViewFlowLayout {
         guard let attributes = super.layoutAttributesForElements(in: rect) else { return nil }
         let centerX = collectionView!.contentOffset.x + collectionView!.bounds.width / 2
         
-        for attribute in attributes {
-            let distance = abs(centerX - attribute.center.x)
+        // Copy and modify each attribute
+        return attributes.map { attribute in
+            let copiedAttribute = attribute.copy() as! UICollectionViewLayoutAttributes
+            let distance = abs(centerX - copiedAttribute.center.x)
             let scale = max(1 - distance / collectionView!.bounds.width, 0.8) // Adjust scaling factor
-            attribute.transform = CGAffineTransform(scaleX: scale, y: scale)
+            copiedAttribute.transform = CGAffineTransform(scaleX: scale, y: scale)
+            return copiedAttribute
         }
-        return attributes
     }
     
     /// Determines whether the layout should be invalidated for bounds changes (e.g., scrolling).
